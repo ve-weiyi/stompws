@@ -69,6 +69,7 @@ func (c *Client) readLoop() {
 		f, err := frame.NewReader(reader).Read()
 		if err != nil {
 			c.log.Warningf("client=%s: frame parse error: %v", c.id, err)
+			c.SendError("frame parse error: "+err.Error(), "")
 			continue
 		}
 		if f == nil {
