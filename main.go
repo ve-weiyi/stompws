@@ -7,6 +7,7 @@ import (
 
 	"github.com/ve-weiyi/stompws/logws"
 	"github.com/ve-weiyi/stompws/server/client"
+	"github.com/ve-weiyi/stompws/web"
 )
 
 func main() {
@@ -18,9 +19,7 @@ func main() {
 	)
 
 	http.HandleFunc("/admin-api/v1/websocket", server.HandleWebSocket)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "web/client.html")
-	})
+	http.HandleFunc("/", web.HandleWebClient)
 
 	fmt.Println("STOMP chat server starting on :9091")
 	if err := http.ListenAndServe(":9091", nil); err != nil {

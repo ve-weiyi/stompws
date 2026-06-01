@@ -44,6 +44,10 @@
     <h1>STOMP WebSocket 聊天室</h1>
 
     <div class="controls">
+        <input type="text" id="wsUrl" placeholder="WebSocket 地址" value="ws://localhost:8080/websocket" style="width: 320px;"/>
+    </div>
+
+    <div class="controls">
         <input type="text" id="username" placeholder="用户名"/>
         <input type="password" id="password" placeholder="密码"/>
         <button onclick="connect()">连接</button>
@@ -86,16 +90,15 @@
     function connect() {
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
-        if (!username) {
-            alert('请输入用户名');
-            return;
-        }
 
-        ws = new WebSocket('ws://localhost:9091/admin-api/v1/websocket');
+        const wsUrl = document.getElementById('wsUrl').value;
+        ws = new WebSocket(wsUrl);
 
         ws.onopen = function () {
-            // 发送 STOMP CONNECT 帧，包含用户名和密码
-            let connectFrame = `CONNECT\naccept-version:1.2\nhost:/\nlogin:${username}\n`;
+            let connectFrame = `CONNECT\naccept-version:1.2\nhost:/\n`;
+            if (username) {
+                connectFrame += `login:${username}\n`;
+            }
             if (password) {
                 connectFrame += `passcode:${password}\n`;
             }
@@ -210,7 +213,11 @@
 
             try {
                 const msg = JSON.parse(body);
-                addMessage(msg.username || '未知用户', msg.content, destination);
+                if (msg.username && msg.content) {
+                    addMessage(msg.username, msg.content, destination);
+                } else {
+                    addMessage('系统', JSON.stringify(msg, null, 2), destination);
+                }
             } catch (e) {
                 addMessage('系统', body, destination);
             }
