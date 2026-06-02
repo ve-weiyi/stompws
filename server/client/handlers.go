@@ -61,6 +61,7 @@ func (s *StompHubServer) handleConnect(c *Client, f *frame.Frame) {
 	c.connected = true
 	s.clients.Store(c.id, c)
 	s.onlineList.Store(c.login, c.id)
+	s.onlineTracker.OnConnect(c.login)
 
 	s.log.Infof("client=%s user=%s: connected, version=%s, heartbeat=%s", c.id, c.login, version, formatHeartBeat(cy, cx))
 
@@ -98,6 +99,7 @@ func (s *StompHubServer) cleanupClient(c *Client) {
 
 	s.clients.Delete(c.id)
 	s.onlineList.Delete(c.login)
+	s.onlineTracker.OnDisconnect(c.login)
 
 	// 重新入队未确认的消息
 	for sub := c.subList.Get(); sub != nil; sub = c.subList.Get() {

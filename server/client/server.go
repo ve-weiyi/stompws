@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -17,7 +18,7 @@ import (
 
 type StompHubServer struct {
 	clients    sync.Map // clientId -> *Client
-	onlineList sync.Map // username -> clientId
+	onlineList sync.Map // login -> clientId
 
 	topicManager  *topic.Manager
 	queueManager  *queue.Manager
@@ -25,6 +26,7 @@ type StompHubServer struct {
 	log           logws.Logger
 	authenticator Authenticator
 	eventHooks    []EventHook
+	onlineTracker OnlineTracker
 }
 
 type ServerOption func(*StompHubServer)
@@ -53,6 +55,16 @@ func WithQueueStorage(storage queue.Storage) ServerOption {
 	}
 }
 
+func WithOnlineTracker(tracker OnlineTracker) ServerOption {
+	return func(s *StompHubServer) {
+		s.onlineTracker = tracker
+	}
+}
+
+func (s *StompHubServer) OnlineTracker() OnlineTracker {
+	return s.onlineTracker
+}
+
 func WithCheckOrigin(checkOrigin func(*http.Request) bool) ServerOption {
 	return func(s *StompHubServer) {
 		s.upgrader.CheckOrigin = checkOrigin
@@ -74,11 +86,15 @@ func NewStompHubServer(opts ...ServerOption) *StompHubServer {
 		log:           logws.NewDefaultLogger(),
 		authenticator: NewNoAuthenticator(),
 		eventHooks:    []EventHook{NewDefaultEventHook()},
+		onlineTracker: NewMemoryOnlineTracker(),
 	}
 
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	s.onlineTracker.SetHub(s)
+	go s.onlineTrackerSyncLoop()
 
 	return s
 }
@@ -147,4 +163,19 @@ func (s *StompHubServer) UnsubscribeFromDestination(sub *Subscription) error {
 		return errInvalidDestination
 	}
 	return nil
+}
+
+// ──────────────── built-in online tracking ────────────────
+
+func (s *StompHubServer) onlineTrackerSyncLoop() {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.onlineList.Range(func(key, _ interface{}) bool {
+			if login, ok := key.(string); ok {
+				s.onlineTracker.OnActive(login)
+			}
+			return true
+		})
+	}
 }

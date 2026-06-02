@@ -15,7 +15,7 @@ import (
 
 type Client struct {
 	conn          *websocket.Conn
-	id            string // client id. It is terminal id or ip address.
+	id            string // client id. It is device id or ip address.
 	login         string // client login. It is username or userId.
 	version       string
 	subscriptions map[string]*Subscription
