@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -50,7 +51,12 @@ func newClient(conn *websocket.Conn) *Client {
 }
 
 func (c *Client) readLoop() {
-	defer c.close()
+	defer func() {
+		if r := recover(); r != nil {
+			c.log.Errorf("client=%s: readLoop panic: %v\nstack: %s", c.id, r, debug.Stack())
+		}
+		c.close()
+	}()
 
 	for {
 		if c.readTimeout > 0 {
@@ -85,6 +91,13 @@ func (c *Client) readLoop() {
 }
 
 func (c *Client) writeLoop(s *StompHubServer) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.log.Errorf("client=%s: writeLoop panic: %v\nstack: %s", c.id, r, debug.Stack())
+		}
+		c.close()
+	}()
+
 	var ticker *time.Ticker
 	var tickerChan <-chan time.Time
 
@@ -129,7 +142,13 @@ func (c *Client) writeLoop(s *StompHubServer) {
 }
 
 func (c *Client) processLoop(s *StompHubServer) {
-	defer s.disconnect(c)
+	defer func() {
+		if r := recover(); r != nil {
+			c.log.Errorf("client=%s: processLoop panic: %v\nstack: %s", c.id, r, debug.Stack())
+		}
+		s.disconnect(c)
+		s.wg.Done()
+	}()
 
 	var ticker *time.Ticker
 	var tickerChan <-chan time.Time
@@ -144,6 +163,15 @@ func (c *Client) processLoop(s *StompHubServer) {
 		select {
 		case f := <-c.readChan:
 			c.handleFrame(s, f)
+		case <-s.ctx.Done():
+			c.SendError("server shutting down", "")
+			// 给 writeLoop 短暂时间发送 ERROR 帧
+			select {
+			case <-time.After(100 * time.Millisecond):
+			case <-c.closeChan:
+			}
+			c.close()
+			return
 		case <-tickerChan:
 			if c.readTimeout > 0 && time.Since(c.lastReadTime) > c.readTimeout*3 {
 				c.close()

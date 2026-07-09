@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -27,6 +28,10 @@ type StompHubServer struct {
 	authenticator Authenticator
 	eventHooks    []EventHook
 	onlineTracker OnlineTracker
+
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 type ServerOption func(*StompHubServer)
@@ -89,6 +94,8 @@ func NewStompHubServer(opts ...ServerOption) *StompHubServer {
 		onlineTracker: NewMemoryOnlineTracker(),
 	}
 
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -100,6 +107,14 @@ func NewStompHubServer(opts ...ServerOption) *StompHubServer {
 }
 
 func (s *StompHubServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	// 关停期间拒绝新连接
+	select {
+	case <-s.ctx.Done():
+		http.Error(w, "server shutting down", http.StatusServiceUnavailable)
+		return
+	default:
+	}
+
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		s.log.Errorf("websocket upgrade failed: %v", err)
@@ -110,6 +125,7 @@ func (s *StompHubServer) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 	c.log = s.log
 	s.log.Infof("new connection from %s", conn.RemoteAddr())
 
+	s.wg.Add(1)
 	go c.readLoop()
 	go c.writeLoop(s)
 	go c.processLoop(s)
@@ -118,6 +134,27 @@ func (s *StompHubServer) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 func (s *StompHubServer) disconnect(c *Client) {
 	// 执行清理逻辑
 	s.cleanupClient(c)
+}
+
+// Shutdown 优雅关闭服务器，等待所有连接处理完毕后退出。
+// timeout 指定等待的最长时间，超时后强制返回。
+func (s *StompHubServer) Shutdown(timeout time.Duration) error {
+	s.cancel()
+
+	done := make(chan struct{})
+	go func() {
+		s.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		s.log.Infof("server shutdown complete")
+		return nil
+	case <-time.After(timeout):
+		s.log.Warningf("server shutdown timeout after %v", timeout)
+		return fmt.Errorf("shutdown timeout after %v", timeout)
+	}
 }
 
 // RouteMessage routes a message based on its destination
