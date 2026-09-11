@@ -330,7 +330,6 @@ Apache License 2.0
 ## 🔗 相关链接
 
 - [STOMP 协议规范](https://stomp.github.io/)
-- [ve-blog-golang 主项目](https://github.com/ve-weiyi/ve-blog-golang)
 - [go-stomp/stomp](https://github.com/go-stomp/stomp)
 
 ## 📝 代码示例
