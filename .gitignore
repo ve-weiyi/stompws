@@ -25,7 +25,6 @@ yarn-error.log*
 
 *.iml
 *.log
-*.sum
 
 bin
 runtime

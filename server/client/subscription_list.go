@@ -52,19 +52,6 @@ func (sl *SubscriptionList) Remove(s *Subscription) {
 	}
 }
 
-// Search for a subscription with the specified id and remove it.
-// Returns a pointer to the subscription if found, nil otherwise.
-func (sl *SubscriptionList) FindByIdAndRemove(id string) *Subscription {
-	for e := sl.subs.Front(); e != nil; e = e.Next() {
-		sub := e.Value.(*Subscription)
-		if sub.id == id {
-			sl.subs.Remove(e)
-			return sub
-		}
-	}
-	return nil
-}
-
 // Finds all subscriptions in the subscription list that are acked by the
 // specified message-id (or ack) header. The subscription is removed from
 // the list and the callback function called for that subscription.
@@ -74,6 +61,9 @@ func (sl *SubscriptionList) Ack(msgId uint64, callback func(s *Subscription)) {
 		sub := e.Value.(*Subscription)
 		if sub.IsAckedBy(msgId) {
 			sl.subs.Remove(e)
+			// 与 Remove / Get 保持一致地清掉回指针。不清的话，ACK 之后重新订阅
+			// 该队列并再次 Add 时会撞上 Add 的重复插入检查而 panic。
+			sub.subList = nil
 			callback(sub)
 		}
 		e = next
@@ -90,18 +80,10 @@ func (sl *SubscriptionList) Nack(msgId uint64, callback func(s *Subscription)) {
 		sub := e.Value.(*Subscription)
 		if sub.IsNackedBy(msgId) {
 			sl.subs.Remove(e)
+			// 同 Ack：清掉回指针，否则重新订阅后再次 Add 会 panic。
+			sub.subList = nil
 			callback(sub)
 		}
-		e = next
-	}
-}
-
-// Invoke a callback function for every subscription in the list.
-func (sl *SubscriptionList) ForEach(callback func(s *Subscription, isLast bool)) {
-	for e := sl.subs.Front(); e != nil; {
-		next := e.Next()
-		sub := e.Value.(*Subscription)
-		callback(sub, next == nil)
 		e = next
 	}
 }

@@ -44,7 +44,7 @@
     <h1>STOMP WebSocket 聊天室</h1>
 
     <div class="controls">
-        <input type="text" id="wsUrl" placeholder="WebSocket 地址" value="ws://localhost:8080/websocket" style="width: 320px;"/>
+        <input type="text" id="wsUrl" placeholder="WebSocket 地址" style="width: 320px;"/>
     </div>
 
     <div class="controls">
@@ -163,7 +163,7 @@
             destInput.placeholder = '/topic/chat';
             msgInput.placeholder = '输入消息...';
         } else if (sendType === 'user') {
-            destInput.placeholder = '/user/用户名';
+            destInput.placeholder = '/queue/user/用户名';
             msgInput.placeholder = '输入私信内容...';
         } else if (sendType === 'command') {
             destInput.placeholder = '/topic/chat';
@@ -221,6 +221,16 @@
             } catch (e) {
                 addMessage('系统', body, destination);
             }
+        } else if (command === 'ERROR') {
+            // 服务端出错时回的就是这一帧，以前没有分支会被整条吞掉。
+            let detail = '';
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i] === '') break;
+                if (lines[i].startsWith('message:')) {
+                    detail = lines[i].substring(8);
+                }
+            }
+            addMessage('系统', `服务端错误：${detail || '(无 message 头)'}`);
         } else if (command === 'RECEIPT') {
             // 静默处理
         }
@@ -232,11 +242,22 @@
         div.className = 'message';
 
         const prefix = destination ? `[${destination}] ` : '';
-        div.innerHTML = `${prefix}<strong>${user}:</strong> ${content}`;
+        // 一律用文本节点拼装：内容来自其它用户，走 innerHTML 会执行其中的标签。
+        div.appendChild(document.createTextNode(prefix));
+        const who = document.createElement('strong');
+        who.textContent = `${user}: `;
+        div.appendChild(who);
+        div.appendChild(document.createTextNode(content));
 
         messages.appendChild(div);
         messages.scrollTop = messages.scrollHeight;
     }
+
+    // 默认 WS 地址按当前页面推导（服务端把测试页挂在根路径上）。
+    document.getElementById('wsUrl').value = location.protocol.startsWith('http')
+        ? `ws://${location.host}/admin-api/v1/websocket`
+        : 'ws://localhost:9091/admin-api/v1/websocket';
+    updateDestinationPlaceholder();
 
     // 回车发送消息
     document.getElementById('messageInput').addEventListener('keypress', function (e) {

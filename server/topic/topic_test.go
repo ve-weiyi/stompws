@@ -1,56 +1,67 @@
 package topic
 
 import (
+	"testing"
+
 	"github.com/go-stomp/stomp/v3/frame"
-	. "gopkg.in/check.v1"
 )
 
-type TopicSuite struct{}
+func TestTopic(t *testing.T) {
+	t.Run("没有订阅者时广播不出错", func(t *testing.T) {
+		topic := newTopic("destination")
 
-var _ = Suite(&TopicSuite{})
+		f := frame.New(frame.MESSAGE,
+			frame.Destination, "destination")
 
-func (s *TopicSuite) TestTopicWithoutSubscription(c *C) {
-	topic := newTopic("destination")
+		topic.Enqueue(f)
+	})
 
-	f := frame.New(frame.MESSAGE,
-		frame.Destination, "destination")
+	t.Run("一个订阅者直接收到原帧", func(t *testing.T) {
+		sub := &fakeSubscription{}
 
-	topic.Enqueue(f)
-}
+		topic := newTopic("destination")
+		topic.Subscribe(sub)
 
-func (s *TopicSuite) TestTopicWithOneSubscription(c *C) {
-	sub := &fakeSubscription{}
+		f := frame.New(frame.MESSAGE,
+			frame.Destination, "destination")
 
-	topic := newTopic("destination")
-	topic.Subscribe(sub)
+		topic.Enqueue(f)
 
-	f := frame.New(frame.MESSAGE,
-		frame.Destination, "destination")
+		if len(sub.Frames) != 1 {
+			t.Fatalf("收到 %d 个帧, want 1", len(sub.Frames))
+		}
+		if sub.Frames[0] != f {
+			t.Errorf("收到的帧 = %p, want 原帧 %p", sub.Frames[0], f)
+		}
+	})
 
-	topic.Enqueue(f)
+	t.Run("两个订阅者中最后一个收原帧其余收副本", func(t *testing.T) {
+		sub1 := &fakeSubscription{}
+		sub2 := &fakeSubscription{}
 
-	c.Assert(len(sub.Frames), Equals, 1)
-	c.Assert(sub.Frames[0], Equals, f)
-}
+		topic := newTopic("destination")
+		topic.Subscribe(sub1)
+		topic.Subscribe(sub2)
 
-func (s *TopicSuite) TestTopicWithTwoSubscriptions(c *C) {
-	sub1 := &fakeSubscription{}
-	sub2 := &fakeSubscription{}
+		f := frame.New(frame.MESSAGE,
+			frame.Destination, "destination",
+			"xxx", "yyy")
 
-	topic := newTopic("destination")
-	topic.Subscribe(sub1)
-	topic.Subscribe(sub2)
+		topic.Enqueue(f)
 
-	f := frame.New(frame.MESSAGE,
-		frame.Destination, "destination",
-		"xxx", "yyy")
-
-	topic.Enqueue(f)
-
-	c.Assert(len(sub1.Frames), Equals, 1)
-	c.Assert(len(sub2.Frames), Equals, 1)
-	c.Assert(sub1.Frames[0], Not(Equals), f)
-	c.Assert(sub2.Frames[0], Equals, f)
+		if len(sub1.Frames) != 1 {
+			t.Fatalf("sub1 收到 %d 个帧, want 1", len(sub1.Frames))
+		}
+		if len(sub2.Frames) != 1 {
+			t.Fatalf("sub2 收到 %d 个帧, want 1", len(sub2.Frames))
+		}
+		if sub1.Frames[0] == f {
+			t.Error("sub1 收到的是原帧, want 一份副本")
+		}
+		if sub2.Frames[0] != f {
+			t.Errorf("sub2 收到的帧 = %p, want 原帧 %p", sub2.Frames[0], f)
+		}
+	})
 }
 
 type fakeSubscription struct {

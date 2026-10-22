@@ -102,7 +102,7 @@ id:sub-1779332290672
 
 | 头部 | 必填 | 说明 |
 |------|------|------|
-| `destination` | 是 | 订阅目标，支持 `/topic/*` 和 `/queue/*` |
+| `dest` | 是 | 订阅目标，支持 `/topic/*` 和 `/queue/*` |
 | `id` | 是 | 订阅 ID，用于后续取消订阅和消息路由 |
 | `ack` | 否 | 确认模式：`auto`（默认）、`client`、`client-individual` |
 | `receipt` | 否 | 填写后服务端会返回 RECEIPT 确认 |
@@ -174,7 +174,7 @@ destination:/user/bob
 
 | 头部 | 必填 | 说明 |
 |------|------|------|
-| `destination` | 是 | 消息目标 |
+| `dest` | 是 | 消息目标 |
 | `content-type` | 否 | 消息体类型，如 `application/json` |
 | `transaction` | 否 | 事务 ID，在事务中发送时填写 |
 | `receipt` | 否 | 填写后服务端会返回 RECEIPT 确认 |
@@ -197,7 +197,7 @@ subscription:sub-1779332290672
 
 | 头部 | 说明 |
 |------|------|
-| `destination` | 消息来源目标 |
+| `dest` | 消息来源目标 |
 | `message-id` | 消息唯一 ID，ACK/NACK 时使用 |
 | `subscription` | 对应的订阅 ID |
 

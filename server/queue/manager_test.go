@@ -1,21 +1,22 @@
 package queue
 
-import (
-	. "gopkg.in/check.v1"
-)
+import "testing"
 
-type ManagerSuite struct{}
-
-var _ = Suite(&ManagerSuite{})
-
-func (s *ManagerSuite) TestManager(c *C) {
+// Find 按目的地创建队列，并对同一目的地返回同一个实例。
+func TestManagerFind(t *testing.T) {
 	mgr := NewManager(NewMemoryQueueStorage())
 
 	q1 := mgr.Find("/queue/1")
-	c.Assert(q1, NotNil)
+	if q1 == nil {
+		t.Fatal("Find(/queue/1) = nil, want a queue")
+	}
 
 	q2 := mgr.Find("/queue/2")
-	c.Assert(q2, NotNil)
+	if q2 == nil {
+		t.Fatal("Find(/queue/2) = nil, want a queue")
+	}
 
-	c.Assert(mgr.Find("/queue/1"), Equals, q1)
+	if again := mgr.Find("/queue/1"); again != q1 {
+		t.Errorf("Find(/queue/1) 第二次 = %p, want 同一个实例 %p", again, q1)
+	}
 }

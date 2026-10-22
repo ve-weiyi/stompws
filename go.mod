@@ -1,15 +1,10 @@
 module github.com/ve-weiyi/stompws
 
-go 1.24.0
+go 1.26.0
 
 require (
-	github.com/go-stomp/stomp/v3 v3.1.5
-	github.com/gorilla/websocket v1.5.3
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
+	github.com/go-stomp/stomp/v3 v3.2.0
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 )
 
-require (
-	github.com/kr/pretty v0.3.1 // indirect
-	github.com/kr/text v0.2.0 // indirect
-	github.com/rogpeppe/go-internal v1.14.1 // indirect
-)
+require golang.org/x/net v0.61.0 // indirect
